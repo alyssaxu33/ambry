@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Streaming, non-blocking router implementation for Ambry.
  */
-class NonBlockingRouter implements Router {
+public class NonBlockingRouter implements Router {
   static final int SHUTDOWN_WAIT_MS = 10 * Time.MsPerSec;
   static final AtomicInteger correlationIdGenerator = new AtomicInteger(0);
   private static final Logger logger = LoggerFactory.getLogger(NonBlockingRouter.class);
@@ -93,7 +93,7 @@ class NonBlockingRouter implements Router {
    * @throws IOException if the OperationController could not be successfully created.
    * @throws ReflectiveOperationException if the OperationController could not be successfully created.
    */
-  NonBlockingRouter(RouterConfig routerConfig, NonBlockingRouterMetrics routerMetrics,
+  public NonBlockingRouter(RouterConfig routerConfig, NonBlockingRouterMetrics routerMetrics,
       NetworkClientFactory networkClientFactory, NotificationSystem notificationSystem, ClusterMap clusterMap,
       KeyManagementService kms, CryptoService cryptoService, CryptoJobHandler cryptoJobHandler,
       AccountService accountService, Time time, String defaultPartitionClass, AmbryCache blobMetadataCache)
@@ -101,6 +101,7 @@ class NonBlockingRouter implements Router {
     this.routerConfig = routerConfig;
     this.routerMetrics = routerMetrics;
     ResponseHandler responseHandler = new ResponseHandler(clusterMap);
+    System.out.println("response handler has been created!");
     this.kms = kms;
     this.cryptoJobHandler = cryptoJobHandler;
     /*
@@ -116,6 +117,7 @@ class NonBlockingRouter implements Router {
               networkClientFactory, clusterMap, routerConfig, responseHandler, notificationSystem, routerMetrics, kms,
               cryptoService, cryptoJobHandler, time, this));
     }
+    System.out.println("ocList has been created!");
     backgroundDeleter =
         new BackgroundDeleter(accountService, networkClientFactory, clusterMap, routerConfig, responseHandler,
             notificationSystem, routerMetrics, kms, cryptoService, cryptoJobHandler, time, this);
@@ -123,6 +125,7 @@ class NonBlockingRouter implements Router {
     ocList.forEach(OperationController::start);
     routerMetrics.initializeNumActiveOperationsMetrics(currentOperationsCount, currentBackgroundOperationsCount,
         backgroundDeleter.getConcurrentBackgroundDeleteOperationCount());
+    System.out.println("router metrics has been initialized!");
     resourcesToClose = new ArrayList<>();
     // Store the blob IDs which were not found in server nodes. This would avoid querying servers again and help in reducing the load.
     // Set the expiration time (routerConfig.routerNotFoundCacheTtlInMs) to 0 to disable the notFoundCache.
@@ -133,6 +136,7 @@ class NonBlockingRouter implements Router {
         .build();
     routerMetrics.initializeNotFoundCacheMetrics(notFoundCache);
     routerMetrics.initializeQuotaOCMetrics(ocList);
+    System.out.println("end of the program!");
   }
 
   /**
@@ -208,6 +212,14 @@ class NonBlockingRouter implements Router {
   }
 
   /**
+   * Get the size of the operation controller list.
+   * @return the size of the operation controller list
+   */
+  public int getOcList(){
+    return ocList.size();
+  }
+
+  /**
    * Add a resource to close when the router shuts down.
    * @param resource the resource that needs closing.
    */
@@ -219,7 +231,7 @@ class NonBlockingRouter implements Router {
    * Returns an {@link OperationController}
    * @return a randomly picked {@link OperationController} from the list of OperationControllers.
    */
-  private OperationController getOperationController() {
+  public OperationController getOperationController() {
     return ocList.get(ThreadLocalRandom.current().nextInt(ocCount));
   }
 
@@ -301,10 +313,12 @@ class NonBlockingRouter implements Router {
     if (blobProperties == null || channel == null || options == null) {
       throw new IllegalArgumentException("blobProperties, channel, or options must not be null");
     }
+    System.out.println("throw exceptions");
     if (userMetadata == null) {
       userMetadata = new byte[0];
     }
     currentOperationsCount.incrementAndGet();
+    System.out.println("increment!");
     if (blobProperties.isEncrypted()) {
       routerMetrics.putEncryptedBlobOperationRate.mark();
     } else {
@@ -312,15 +326,19 @@ class NonBlockingRouter implements Router {
     }
     routerMetrics.operationQueuingRate.mark();
     FutureResult<String> futureResult = new FutureResult<>();
+    System.out.println("create future");
     if (isOpen.get()) {
       getOperationController().putBlob(blobProperties, userMetadata, channel, options, futureResult, callback,
           quotaChargeCallback);
+      System.out.println("oc starts ti work!");
     } else {
       RouterException routerException =
           new RouterException("Cannot accept operation because Router is closed", RouterErrorCode.RouterClosed);
       routerMetrics.operationDequeuingRate.mark();
+      System.out.println("mark again");
       routerMetrics.onPutBlobError(routerException, blobProperties.isEncrypted(), false);
       completeOperation(futureResult, callback, null, routerException);
+      System.out.println("end of program");
     }
     return futureResult;
   }
@@ -702,7 +720,7 @@ class NonBlockingRouter implements Router {
    * Returns whether the router is open or closed.
    * @return true if the router is open.
    */
-  boolean isOpen() {
+  public boolean isOpen() {
     return isOpen.get();
   }
 
@@ -710,7 +728,7 @@ class NonBlockingRouter implements Router {
    * Return the count of the number of operations submitted to the router that are not yet completed.
    * @return number of operations being handled at the time of this call.
    */
-  int getOperationsCount() {
+  public int getOperationsCount() {
     return currentOperationsCount.get();
   }
 
@@ -723,7 +741,7 @@ class NonBlockingRouter implements Router {
    * completed.
    * @return number of background operations being handled at the time of this call.
    */
-  int getBackgroundOperationsCount() {
+  public int getBackgroundOperationsCount() {
     return currentBackgroundOperationsCount.get();
   }
 

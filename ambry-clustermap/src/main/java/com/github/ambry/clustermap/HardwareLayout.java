@@ -298,7 +298,7 @@ public class HardwareLayout {
 
   public JSONObject toJSONObject() throws JSONException {
     JSONObject jsonObject =
-        new JSONObject().put("clusterName", clusterName).put("version", version).put("datacenters", new JSONArray());
+        new JSONObject().put("clusterName", clusterName)./*put("version", version).*/put("datacenters", new JSONArray());
     for (Datacenter datacenter : datacenters) {
       jsonObject.accumulate("datacenters", datacenter.toJSONObject());
     }

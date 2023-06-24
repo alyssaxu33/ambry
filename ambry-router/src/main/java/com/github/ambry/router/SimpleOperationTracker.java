@@ -263,7 +263,7 @@ class SimpleOperationTracker implements OperationTracker {
     // Order the replicas so that local healthy replicas are ordered and returned first,
     // then the remote healthy ones, and finally the possibly down ones.
     List<? extends ReplicaId> replicas =
-        routerConfig.routerGetEligibleReplicasByStateEnabled ? eligibleReplicas : partitionId.getReplicaIds();
+        routerConfig.routerGetEligibleReplicasByStateEnabled ? eligibleReplicas : new ArrayList<>(partitionId.getReplicaIds());
 
     // In a case where a certain dc is decommissioned and blobs previously uploaded to this dc now have a unrecognizable
     // dc id. Current clustermap code will treat originating dc as null if dc id is not identifiable. To improve success
@@ -352,6 +352,8 @@ class SimpleOperationTracker implements OperationTracker {
     if (totalReplicaCount < getSuccessTarget()) {
       throw notEnoughReplicasException.get();
     }
+    System.err.println("simple operation tracker: totalReplicaCount " + totalReplicaCount + " success target: " + getSuccessTarget());
+    System.err.println("simple operation tracker: replicaPool: " + replicaPool);
 
     originatingDcTotalReplicaCount = (int) allReplicas.stream()
         .filter(replicaId -> replicaId.getDataNodeId().getDatacenterName().equals(this.originatingDcName))

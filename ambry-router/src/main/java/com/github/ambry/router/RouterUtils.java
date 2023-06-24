@@ -134,6 +134,7 @@ public class RouterUtils {
    * @return the number of data chunks for the given blob and chunk sizes.
    */
   static int getNumChunksForBlobAndChunkSize(long blobSize, int chunkSize) {
+    System.out.println("routerUtils: do we enter this?");
     return (int) (blobSize == 0 ? 1 : (blobSize - 1) / chunkSize + 1);
   }
 

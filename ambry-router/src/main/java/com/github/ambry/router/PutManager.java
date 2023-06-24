@@ -213,8 +213,11 @@ class PutManager {
     requestRegistrationCallback.setRequestsToDrop(requestsToDrop);
     for (PutOperation op : putOperations) {
       try {
+        System.out.println("put manager: polling operation");
         op.poll(requestRegistrationCallback);
+        System.out.println("put manager: polling operation complete");
       } catch (Exception e) {
+        System.out.println("put manager: poll exception" + e);
         op.setOperationExceptionAndComplete(
             new RouterException("Put poll encountered unexpected error", e, RouterErrorCode.UnexpectedInternalError));
       }

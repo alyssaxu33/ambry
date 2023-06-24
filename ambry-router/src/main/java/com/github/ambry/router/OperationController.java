@@ -191,6 +191,7 @@ public class OperationController implements Runnable {
     if (!putManager.isOpen()) {
       handlePutManagerClosed(blobProperties, false, futureResult, callback);
     } else {
+      System.out.println("reach submit operation point!");
       putManager.submitPutBlobOperation(blobProperties, userMetadata, channel, options, futureResult, callback,
           quotaChargeCallback);
       routerCallback.onPollReady();
@@ -500,6 +501,7 @@ public class OperationController implements Runnable {
    */
   protected void pollForRequests(List<RequestInfo> requestsToSend, Set<Integer> requestsToDrop) {
     try {
+      System.out.println("operation controller: poll requests");
       putManager.poll(requestsToSend, requestsToDrop);
       getManager.poll(requestsToSend, requestsToDrop);
       nonBlockingRouter.initiateBackgroundDeletes(backgroundDeleteRequests);
@@ -540,6 +542,7 @@ public class OperationController implements Runnable {
           logger.debug("Handling response of type {} for {}", type, requestInfo.getRequest().getCorrelationId());
           switch (type) {
             case PutRequest:
+              System.out.println("operation  controller: received a put response");
               putManager.handleResponse(responseInfo);
               break;
             case GetRequest:
@@ -591,10 +594,11 @@ public class OperationController implements Runnable {
         List<RequestInfo> requestsToSend = new ArrayList<>();
         Set<Integer> requestsToDrop = new HashSet<>();
         pollForRequests(requestsToSend, requestsToDrop);
-
+        System.err.println("operation controller: request to send" + requestsToSend.size());
         List<ResponseInfo> responseInfoList = networkClient.sendAndPoll(requestsToSend,
             routerConfig.routerDropRequestOnTimeout ? requestsToDrop : Collections.emptySet(),
             NETWORK_CLIENT_POLL_TIMEOUT);
+        System.err.println("operation controller: response info list" + responseInfoList.size());
         responseInfoList.addAll(getNonQuotaCompliantResponses());
         onResponse(responseInfoList);
         responseInfoList.forEach(ResponseInfo::release);

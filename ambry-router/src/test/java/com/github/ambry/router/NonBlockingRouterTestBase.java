@@ -207,6 +207,7 @@ public class NonBlockingRouterTestBase {
    * router with them.
    */
   protected void setRouter() throws Exception {
+
     setRouter(getNonBlockingRouterProperties(mockClusterMap.getDatacenterName(mockClusterMap.getLocalDatacenterId())),
         mockServerLayout, new LoggingNotificationSystem());
   }

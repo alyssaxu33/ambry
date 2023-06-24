@@ -62,6 +62,7 @@ class DataNode implements DataNodeId {
         clusterMapConfig.clusterMapResolveHostnames ? getFullyQualifiedDomainName(jsonObject.getString("hostname"))
             : jsonObject.getString("hostname");
     this.portNum = jsonObject.getInt("port");
+    //this.portNum = (int) jsonObject.getJSONObject("ports").get("PLAINTEXT");
     try {
       ResourceStatePolicyFactory resourceStatePolicyFactory =
           Utils.getObj(clusterMapConfig.clusterMapResourceStatePolicyFactory, this,

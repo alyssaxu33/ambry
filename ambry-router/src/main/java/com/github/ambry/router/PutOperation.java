@@ -33,6 +33,7 @@ import com.github.ambry.messageformat.BlobType;
 import com.github.ambry.messageformat.MessageFormatRecord;
 import com.github.ambry.messageformat.MetadataContentSerDe;
 import com.github.ambry.network.Port;
+import com.github.ambry.network.PortType;
 import com.github.ambry.network.RequestInfo;
 import com.github.ambry.network.ResponseInfo;
 import com.github.ambry.notification.NotificationBlobType;
@@ -54,6 +55,7 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import java.nio.ByteBuffer;
+//import java.nio.HeapByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -345,6 +347,7 @@ class PutOperation {
       } else if (isStitchOperation()) {
         processChunksToStitch();
       } else {
+        System.err.println("to see if we have reached startOperation");
         startReadingFromChannel();
       }
     } catch (Exception e) {
@@ -370,10 +373,14 @@ class PutOperation {
         setOperationExceptionAndComplete(exception);
         routerCallback.onPollReady();
       } else {
+        System.err.println("start chunk filling");
         blobSize = result;
         chunkFillingCompletedSuccessfully = true;
+
+        System.err.println("chunk filling successfully" + blobSize);
       }
       chunkFillerChannel.close();
+      System.err.println("chunk filling closes");
     });
   }
 
@@ -524,13 +531,18 @@ class PutOperation {
     if (operationCompleted) {
       return;
     }
+    System.err.println("put operation: polling operation is not completed" + metadataPutChunk.isMetadataChunk());
     metadataPutChunk.poll(requestRegistrationCallback);
+    System.err.println("put operation: metadata chunk poll");
     if (metadataPutChunk.isComplete()) {
+      System.err.println("put operation: metadatachunk complete");
       if (getNumDataChunks() > 1) {
         onChunkOperationComplete(metadataPutChunk);
       }
     } else if (!metadataPutChunk.isReady()) {
+      System.err.println("put operation: metadatachunk is not ready " + putChunks.size());
       for (PutChunk chunk : putChunks) {
+        System.err.println("put operation:  looping through put chunks for polling: " + chunk.isReady());
         if (chunk.isReady()) {
           chunk.poll(requestRegistrationCallback);
           if (chunk.isComplete()) {
@@ -542,6 +554,8 @@ class PutOperation {
           }
         }
       }
+    }else{
+      System.err.println("put operation: else else");
     }
   }
 
@@ -614,9 +628,11 @@ class PutOperation {
       while (!isChunkFillingDone()) {
         // Attempt to fill a chunk
         if (channelReadBuf == null) {
+
           channelReadBuf = chunkFillerChannel.getNextByteBuf(0);
         }
         if (channelReadBuf != null) {
+          System.err.println("put operation: next chunk received");
           maybeStopTrackingWaitForChannelDataTime();
           chunkToFill = getChunkToFill();
           if (chunkToFill == null) {
@@ -627,6 +643,7 @@ class PutOperation {
             // channel has data, and there is a chunk that can be filled.
             maybeStopTrackingWaitForChunkTime();
             bytesFilledSoFar += chunkToFill.fillFrom(channelReadBuf);
+            System.err.println("put operation: bytes filled so far" + bytesFilledSoFar);
             enforceMaxUploadSize();
 
             if (chunkToFill.isReady() && !chunkToFill.chunkBlobProperties.isEncrypted()) {
@@ -864,8 +881,9 @@ class PutOperation {
    * @throws IllegalStateException if the chunk filling has not yet completed.
    */
   int getNumDataChunks() {
-    return isStitchOperation() ? chunksToStitch.size()
-        : RouterUtils.getNumChunksForBlobAndChunkSize(getBlobSize(), routerConfig.routerMaxPutChunkSizeBytes);
+    System.err.println("put operation getnumdata: do we enter this " + routerConfig.routerMaxPutChunkSizeBytes);
+    return isStitchOperation() ? chunksToStitch.size(): 1;
+        //: RouterUtils.getNumChunksForBlobAndChunkSize(getBlobSize(), routerConfig.routerMaxPutChunkSizeBytes);
   }
 
   /**
@@ -874,10 +892,12 @@ class PutOperation {
    * @throws IllegalStateException if the chunk filling has not yet completed.
    */
   long getBlobSize() {
+    System.err.println("put operation metadata: do we get blobsize? " + blobSize);
     if (!chunkFillingCompletedSuccessfully) {
       throw new IllegalStateException("Request for blob size before chunk fill completion");
     }
     return blobSize;
+
   }
 
   /**
@@ -1220,6 +1240,7 @@ class PutOperation {
         BlobDataType blobDataType = isMetadataChunk() ? BlobDataType.METADATA : BlobDataType.DATACHUNK;
 
         partitionId = getPartitionForPut(partitionClass, attemptedPartitionIds);
+        System.err.println("put operation: partition id: " + partitionId);
         // To ensure previously attempted partitions are not retried for this PUT after a failure.
         attemptedPartitionIds.add(partitionId);
 
@@ -1256,6 +1277,7 @@ class PutOperation {
       OperationTracker operationTracker;
       String trackerType = routerConfig.routerPutOperationTrackerType;
       String originatingDcName = clusterMap.getDatacenterName(clusterMap.getLocalDatacenterId());
+      System.err.println("put operation: operation tracker: " + originatingDcName);
       if (trackerType.equals(SimpleOperationTracker.class.getSimpleName())) {
         operationTracker =
             new SimpleOperationTracker(routerConfig, RouterOperation.PutOperation, partitionId, originatingDcName, true,
@@ -1498,9 +1520,13 @@ class PutOperation {
      */
     void poll(RequestRegistrationCallback<PutOperation> requestRegistrationCallback) {
       cleanupExpiredInFlightRequests(requestRegistrationCallback);
+      System.err.println("put operation:  start polling");
       checkAndMaybeComplete();
+      System.err.println("put operation:  middle polling");
       if (!isComplete()) {
         fetchRequests(requestRegistrationCallback);
+      }else{
+        System.err.println("put operation:  complete");
       }
     }
 
@@ -1554,30 +1580,42 @@ class PutOperation {
      */
     private void fetchRequests(RequestRegistrationCallback<PutOperation> requestRegistrationCallback) {
       Iterator<ReplicaId> replicaIterator = operationTracker.getReplicaIterator();
+      System.err.println("put operation: trying to fetch requests for blob id: " + chunkBlobId.getID());
       while (replicaIterator.hasNext()) {
         ReplicaId replicaId = replicaIterator.next();
         String hostname = replicaId.getDataNodeId().getHostname();
-        Port port = RouterUtils.getPortToConnectTo(replicaId, routerConfig.routerEnableHttp2NetworkClient);
-        PutRequest putRequest = createPutRequest();
+        System.err.println("put operation: hostname:" + hostname);
+        //Port port = RouterUtils.getPortToConnectTo(replicaId, routerConfig.routerEnableHttp2NetworkClient);
+        Port port = new Port(replicaId.getDataNodeId().getHttp2Port(), PortType.HTTP2);
+        System.err.println("put operation: port:" + port);
+        PutRequest putRequest = null;
+        try{
+          putRequest = createPutRequest();
+        }catch(Exception e){
+          e.printStackTrace();
+        }
+        System.err.println("put operation: request:" + putRequest);
         RequestInfo requestInfo =
             new RequestInfo(hostname, port, putRequest, replicaId, prepareQuotaCharger(), time.milliseconds(),
                 routerConfig.routerRequestNetworkTimeoutMs, routerConfig.routerRequestTimeoutMs);
+        System.err.println("put operation: hostname:" + hostname);
         int correlationId = putRequest.getCorrelationId();
         correlationIdToChunkPutRequestInfo.put(correlationId, requestInfo);
         correlationIdToPutChunk.put(correlationId, this);
         requestRegistrationCallback.registerRequestToSend(PutOperation.this, requestInfo);
         replicaIterator.remove();
-        if (RouterUtils.isRemoteReplica(routerConfig, replicaId)) {
-          logger.debug("{}: Making request with correlationId {} to a remote replica {} in {}", loggingContext,
-              correlationId, replicaId.getDataNodeId(), replicaId.getDataNodeId().getDatacenterName());
-          routerMetrics.crossColoRequestCount.inc();
-        } else {
-          logger.trace("{}: Making request with correlationId {} to a local replica {}", loggingContext, correlationId,
-              replicaId.getDataNodeId());
-        }
+//        if (RouterUtils.isRemoteReplica(routerConfig, replicaId)) {
+//          logger.debug("{}: Making request with correlationId {} to a remote replica {} in {}", loggingContext,
+//              correlationId, replicaId.getDataNodeId(), replicaId.getDataNodeId().getDatacenterName());
+//          routerMetrics.crossColoRequestCount.inc();
+//        } else {
+//          logger.trace("{}: Making request with correlationId {} to a local replica {}", loggingContext, correlationId,
+//              replicaId.getDataNodeId());
+//        }
         routerMetrics.getDataNodeBasedMetrics(replicaId.getDataNodeId()).putRequestRate.mark();
         routerMetrics.routerPutRequestRate.mark();
       }
+      System.err.println("put operation fetch requests: " + requestRegistrationCallback.getRequestsToSend().size());
     }
 
     /**
@@ -1586,8 +1624,14 @@ class PutOperation {
      * @return the crated {@link PutRequest}.
      */
     protected PutRequest createPutRequest() {
-      return new PutRequest(NonBlockingRouter.correlationIdGenerator.incrementAndGet(), routerConfig.routerHostname,
-          chunkBlobId, chunkBlobProperties, ByteBuffer.wrap(chunkUserMetadata), buf.retainedDuplicate(),
+      //int correlationid = NonBlockingRouter.correlationIdGenerator.incrementAndGet();
+      //bytebuff metadatabytebuffer = ByteBuffer.wrap(chunkUserMetadata);
+      ByteBuffer md = ByteBuffer.allocate(chunkUserMetadata.length);
+      md.put(chunkUserMetadata);
+      md.flip();
+      System.err.println("metadata chunk is ready to send");
+      return new PutRequest(1000, routerConfig.routerHostname,
+          chunkBlobId, chunkBlobProperties, md, buf.retainedDuplicate(),
           buf.readableBytes(), BlobType.DataBlob, encryptedPerBlobKey != null ? encryptedPerBlobKey.duplicate() : null,
           isChunkCompressed);
     }
@@ -1880,13 +1924,24 @@ class PutOperation {
 
     @Override
     void poll(RequestRegistrationCallback<PutOperation> requestRegistrationCallback) {
+      System.err.println("put operation metadata: do we enter the netadatachunk poll?");
+      int size = indexToChunkIdsAndChunkSizes.size();
+      System.err.println("put operation metadata: do we get chunk size?");
+      int numDataChunks = getNumDataChunks();
+      System.err.println("put operation metadata: do we get chunk num?");
       if (isBuilding() && chunkFillingCompletedSuccessfully
-          && indexToChunkIdsAndChunkSizes.size() == getNumDataChunks()) {
+          && size == numDataChunks) {
+        System.err.println("put operation: do we enter the if?");
         finalizeMetadataChunk();
+        System.err.println("put operation: meta data is finalized");
+      }else{
+        System.err.println("put operation: did not finalize meta data");
       }
       if (isReady()) {
         super.poll(requestRegistrationCallback);
+        System.err.println("put operation: is metadata ready?" + isReady());
       }
+      System.err.println("put operation metadata: do we exit the netadatachunk poll?");
     }
 
     /**
